@@ -1,43 +1,54 @@
-name: Deploy My Server
+# This is a basic workflow to help you get started with Actions
 
+name: Build and deploy
+
+# Controls when the action will run. 
 on:
+  # Triggers the workflow on push or pull request events but only for the main branch
   push:
-    branches:
-      - master # 只在master上push触发部署
-    
+    branches: [ main ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  deploy:
-    runs-on: ubuntu-latest # 使用ubuntu系统镜像运行自动化脚本
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
 
-    steps: # 自动化步骤
-      #下载代码仓库
-      - uses: actions/checkout@v1 
-      # 使用action库，安装node
-      - name: use Node.js  # 使用action库  actions/setup-node安装node
-        uses: actions/setup-node@v3
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+
+      - name: Use Node.js
+        uses: actions/setup-node@v1
         with:
-          node-version: 16
-      # 安装依赖
-      - name: npm install 
-        run: npm install 
-    
-      #打包项目
-      - name: Build
-        run: npm run docs:build
-
-      #部署到服务器
-      - name: Deploy to Staging My server
-        uses: easingthemes/ssh-deploy@v2.1.6
-        env:
-          # 使用GitHub仓库里的secret设置的值
-          SSH_PRIVATE_KEY: ${{ secrets.MY_SERVER_PRIVATE_KEY }} 
-          # 源目录，编译后生成的文件目录
-          SOURCE: './docs/.vuepress/dist/'
-          #服务器公网地址
-          REMOTE_HOST: ${{ secrets.MY_SERVER_IP }}
-          #服务器用户名-一般默认root
-          REMOTE_USER: 'root'
-          #服务器中，代码部署的位置
-          TARGET: '/opt/myblog'
-          #去除的文件
-          EXCLUDE: "/dist/, /node_modules/" 
+          node-version: "14"
+          
+      # 缓存 node_modules
+      - name: Cache dependencies
+        uses: actions/cache@v2
+        id: yarn-cache
+        with:
+          path: |
+            **/node_modules
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+            
+      # 如果缓存没有命中，安装依赖，根据实际来改，也可以是npm，这里是用的yarn
+      - name: Install dependencies
+        if: steps.yarn-cache.outputs.cache-hit != 'true'
+        run: npm
+ 
+      - name: Deploy
+        uses: JamesIves/github-pages-deploy-action@releases/v3
+        with:
+          ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          # 部署到 gh-pages 分支
+          BRANCH: gh-pages
+          # 部署目录为 VuePress 的默认输出目录，这里需要根据项目的目录进行修改
+          FOLDER: docs/.vuepress/dist
